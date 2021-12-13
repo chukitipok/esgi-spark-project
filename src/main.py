@@ -1,13 +1,16 @@
 import os
 from pyspark.sql import SparkSession
 from github_repos_dataframe import GithubReposDataFrame
+import time
+
 
 if __name__ == '__main__':
+    start_time = time.time()
     spark = SparkSession.builder.master('local').appName('spark-project').getOrCreate()
-    spark.sparkContext.setLogLevel('OFF')
+    # spark.sparkContext.setLogLevel('OFF')
     github_repo = GithubReposDataFrame(spark)
     
-    os.system('clear')
+    # os.system('clear')
 
     # Question 1:
     print('The 10 projects with the most commits are:')
@@ -24,5 +27,7 @@ if __name__ == '__main__':
     # Question 4:
     print('The 10 words most used in commits message are:')
     github_repo.words_most_used_in_commits().show(truncate = False)
-
+    
     spark.stop()
+
+    print("--- " + str((time.time() - start_time) / 60) +  " minutes ---")

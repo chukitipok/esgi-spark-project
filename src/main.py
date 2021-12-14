@@ -6,11 +6,16 @@ import time
 
 if __name__ == '__main__':
     start_time = time.time()
-    spark = SparkSession.builder.master('local').appName('spark-project').getOrCreate()
-    # spark.sparkContext.setLogLevel('OFF')
+    spark = SparkSession.builder \
+        .config('spark.sql.shuffle.partitions', 10) \
+        .master('local') \
+        .appName('spark-project') \
+        .getOrCreate()
+
+    spark.sparkContext.setLogLevel('OFF')
     github_repo = GithubReposDataFrame(spark)
     
-    # os.system('clear')
+    os.system('clear')
 
     # Question 1:
     print('The 10 projects with the most commits are:')
@@ -21,13 +26,15 @@ if __name__ == '__main__':
     print()
 
     # Question 3:
-    print('The best contributor on "apache/spark" project for the last 6 months is: ' + github_repo.best_contributor_on_last_x_months('apache/spark', 6))
+    print('The best contributor on "apache/spark" project for the last 6 months is: ' + github_repo.best_contributor_on_last_x_months('apache/spark', 24))
     print()
 
     # Question 4:
     print('The 10 words most used in commits message are:')
     github_repo.words_most_used_in_commits().show(truncate = False)
     
-    spark.stop()
-
     print("--- " + str((time.time() - start_time) / 60) +  " minutes ---")
+
+    time.sleep(10000)
+
+    spark.stop()

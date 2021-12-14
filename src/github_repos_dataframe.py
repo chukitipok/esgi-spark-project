@@ -8,13 +8,11 @@ class GithubReposDataFrame:
         self.spark = spark
         self.dataset = spark.read.option('header', 'true').csv('./resources/full.csv')
         self.spark.sql("set spark.sql.legacy.timeParserPolicy=LEGACY")
-        self.stop_words = self.__prepare_stop_words()
+        self.stop_words = None
 
     def __prepare_stop_words(self):
-        df = self.spark.read.option('header', 'true').text('./resources/stop_words_en.txt')
-        stop_words = [row.value for row in df.collect()]
-
-        return self.spark.createDataFrame(data=[('tmp', stop_words)], schema=['tmp', 'stop_words'])
+        words_df = self.spark.read.option('header', 'true').text('./resources/stop_words_en.txt')
+        return [row.value for row in words_df.collect()]
     
     def repos_with_most_commits(self, limit: int = 10) -> DataFrame:
         return self.dataset.select('repo')\
@@ -37,9 +35,9 @@ class GithubReposDataFrame:
         return row.author if row is not None else 'No commits made on "' + project_name + '".'
 
     def best_contributor_on_last_x_months(self, project_name: str, last_months: int) -> str:
-        pattern = "E LLL d HH:mm:ss yyyy Z"
+        pattern = 'E LLL d HH:mm:ss yyyy Z'
         row = self.dataset.select('author', 'date', months_between(current_date(), to_date('date', pattern)).alias('months'))\
-            .where((col('repo') == project_name) & (col('months') <= last_months) & (col('months') >= 0))\
+            .filter((col('repo') == project_name) & (col('months') <= last_months) & (col('months') >= 0))\
             .groupBy('author')\
             .count()\
             .orderBy('count', ascending = False)\
@@ -47,13 +45,12 @@ class GithubReposDataFrame:
             
         return row.author if row is not None else 'No commits made the last ' + str(last_months) + ' months on "' + project_name + '".'
 
-    def words_most_used_in_commits(self, limit: int = 10) -> DataFrame:        
-        return self.dataset.withColumn('tmp', lit('tmp')) \
-            .join(self.stop_words, on = ['tmp']) \
-            .drop('tmp') \
-            .select(array_except(split('message', ' '), col('stop_words')).alias('messages')) \
-            .withColumn('word', explode(col('messages'))) \
-            .groupBy('word') \
+    def words_most_used_in_commits(self, limit: int = 10) -> DataFrame:
+        self.stop_words = self.__prepare_stop_words()
+        return self.dataset.where(col('message').isNotNull()) \
+            .select(explode(split('message', ' ')).alias('words')) \
+            .where(col('words').isin(self.stop_words) == False) \
+            .groupBy(lower(col('words')).alias('words')) \
             .count() \
-            .sort('count', ascending = False) \
+            .orderBy(col('count'), ascending = False) \
             .limit(limit)
